@@ -1,0 +1,22 @@
+{
+	"name": "on-cli",
+	"version": "0.1.0",
+	"description": "CLI for the ON (Orka náttúrunnar) EV-charging app — sessions, vehicles, chargers, invoices, and RFID keys from your terminal. AI-agent friendly. Built with Bun.",
+	"module": "src/index.ts",
+	"type": "module",
+	"private": true,
+	"bin": { "on": "src/index.ts" },
+	"scripts": {
+		"start": "bun src/index.ts",
+		"dev": "bun --watch src/index.ts",
+		"build": "bun build --compile src/index.ts --outfile on",
+		"typecheck": "bunx tsc --noEmit",
+		"lint": "bunx biome check src/",
+		"check": "bun run lint && bun run typecheck"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.0.0",
+		"@types/bun": "latest",
+		"typescript": "^5.6.0"
+	}
+}
