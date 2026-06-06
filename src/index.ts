@@ -12,6 +12,8 @@ import { loginCommand } from "./commands/login.ts";
 import { logoutCommand } from "./commands/logout.ts";
 import { schemaCommand } from "./commands/schema.ts";
 import { sessionsCommand } from "./commands/sessions.ts";
+import { startCommand } from "./commands/start.ts";
+import { stopCommand } from "./commands/stop.ts";
 import { vehiclesCommand } from "./commands/vehicles.ts";
 import { whoamiCommand } from "./commands/whoami.ts";
 import { ApiError, AuthError } from "./lib/api.ts";
@@ -78,6 +80,16 @@ const COMMANDS: CommandSpec[] = [
 	{
 		name: "live",
 		description: "Current charging status: active sessions, reservations, counters.",
+	},
+	{
+		name: "stop",
+		description: "Stop the active charging session (mutating; asks to confirm unless --yes).",
+		usage: "on stop [--force] [--yes]",
+	},
+	{
+		name: "start",
+		description: "Start charging at an EVSE (mutating; needs --evse + --connector).",
+		usage: "on start --evse <code> --connector <id> [--preauth <id>] [--coupon <id>] [--yes]",
 	},
 	{ name: "keys", description: "Your ON RFID charging keys/cards." },
 	{
@@ -149,6 +161,18 @@ async function main(): Promise<void> {
 			return sessionsCommand({ id: getFlag("id"), limit: getFlag("limit"), raw, ...globalFlags });
 		case "live":
 			return liveCommand({ raw, ...globalFlags });
+		case "stop":
+			return stopCommand({ force: hasFlag("force"), yes: hasFlag("yes"), ...globalFlags });
+		case "start":
+			return startCommand({
+				evse: getFlag("evse"),
+				connector: getFlag("connector"),
+				chargepoint: getFlag("chargepoint"),
+				preauth: getFlag("preauth"),
+				coupon: getFlag("coupon"),
+				yes: hasFlag("yes"),
+				...globalFlags,
+			});
 		case "keys":
 			return keysCommand({ raw, ...globalFlags });
 		case "invoices":

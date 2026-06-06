@@ -8,14 +8,19 @@
 
 import type {
 	AuthState,
+	ChargingCommandBody,
+	ChargingCommandResponse,
 	ChargingSession,
+	CurrentSession,
 	Invoice,
 	Location,
 	Me,
 	OnlineData,
 	Paged,
 	PeriodicData,
+	ResultCodeResponse,
 	RfidCard,
+	StopResponse,
 	TokenResponse,
 	Vehicle,
 } from "./types.ts";
@@ -155,6 +160,22 @@ export class OnClient {
 		return this.parse<T>(res, "GET", path);
 	}
 
+	/** Authenticated POST (JSON body) with the same refresh handling. */
+	private async post<T>(path: string, body?: unknown): Promise<T> {
+		await this.refreshIfNearExpiry();
+		const send = () =>
+			this.raw("POST", path, {
+				headers: body !== undefined ? { "Content-Type": "application/json" } : {},
+				body: body !== undefined ? JSON.stringify(body) : undefined,
+			});
+		let res = await send();
+		if ((res.status === 401 || res.status === 403) && this.refreshToken) {
+			await this.refresh();
+			res = await send();
+		}
+		return this.parse<T>(res, "POST", path);
+	}
+
 	// --- auth ---------------------------------------------------------------
 
 	/** Password grant. Unauthenticated; returns the raw token response. */
@@ -240,6 +261,24 @@ export class OnClient {
 		return this.get<OnlineData>("/api/onlineData");
 	}
 
+	// --- charging commands (mutating) ---------------------------------------
+	// Verified against the decompiled DuskyPrivateService/Requester (v2025.7.5).
+
+	startCharging(body: ChargingCommandBody): Promise<ChargingCommandResponse> {
+		return this.post<ChargingCommandResponse>("/api/commands/remoteStartTransaction", body);
+	}
+
+	stopCharging(body: ChargingCommandBody): Promise<StopResponse> {
+		return this.post<StopResponse>("/api/commands/remoteStopTransaction", body);
+	}
+
+	/** Force-stop by connector id. Simpler fallback when the graceful stop fails. */
+	stopChargingForce(connectorId: number): Promise<ResultCodeResponse> {
+		return this.post<ResultCodeResponse>(
+			`/api/chargingSessions/forceStop/${encodeURIComponent(String(connectorId))}`,
+		);
+	}
+
 	getPeriodicData(): Promise<PeriodicData> {
 		return this.get<PeriodicData>("/api/periodicData");
 	}
@@ -288,4 +327,55 @@ function truncate(s: string, n: number): string {
 
 export function paged<T>(p: Paged<T> | undefined): T[] {
 	return p && Array.isArray(p.Content) ? p.Content : [];
+}
+
+/** True when a session is roaming (RoamingActor has an Id and platform ≠ 5).
+ * Mirrors CurrentSessionScheme.isRoaming() from the app. */
+export function isRoamingSession(s: CurrentSession): boolean {
+	const actor = s.RoamingActor;
+	if (!actor || actor.Id == null) return false;
+	const platformId = actor.RoamingPlatform?.Id;
+	return platformId == null || platformId !== 5;
+}
+
+export interface StopTarget {
+	body: ChargingCommandBody;
+	roaming: boolean;
+	connectorId?: number;
+	location?: string;
+}
+
+/** Build the exact remoteStopTransaction body from a live CurrentSession,
+ * replicating the app's EvseCode construction:
+ *   non-roaming: `${ChargePoint.FriendlyCode}-${Evse.FriendlyCode}-${Connector.Code}`
+ *   roaming:     `${Evse.FriendlyCode}`
+ * Throws if the session is missing the identifiers needed to stop it. */
+export function buildStopTarget(s: CurrentSession): StopTarget {
+	const roaming = isRoamingSession(s);
+	const cpCode = s.ChargePoint?.FriendlyCode;
+	const evseCode = s.Evse?.FriendlyCode;
+	const connCode = s.Connector?.Code;
+	const chargePointId = s.ChargePoint?.Id;
+	const connectorId = s.Connector?.Id;
+
+	const EvseCode = roaming
+		? evseCode
+		: cpCode != null && evseCode != null && connCode != null
+			? `${cpCode}-${evseCode}-${connCode}`
+			: undefined;
+
+	if (!EvseCode) {
+		throw new ApiError(
+			"Active session is missing EVSE identifiers; cannot build a stop command.",
+			0,
+			s,
+		);
+	}
+
+	return {
+		body: { EvseCode, ChargePointId: chargePointId, ConnectorId: connectorId, SocLimits: false },
+		roaming,
+		connectorId,
+		location: s.Location?.FriendlyName,
+	};
 }

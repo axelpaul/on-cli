@@ -47,11 +47,38 @@ on whoami                                  the logged-in user
 on vehicles                                vehicles on your account
 on sessions [--limit N] [--id <id>]        charging history (or one session in full)
 on live                                     active sessions, reservations, counters
+on stop [--force] [--yes]                   stop the active charging session (mutating)
+on start --evse <code> --connector <id> [--yes]   start charging (mutating)
 on keys                                     your RFID charging keys/cards
 on invoices [--limit N]                     your invoices
 on locations [--lat] [--lng] [--radius KM] [--available] [--free] [--limit N]
                                             find chargers near a point (public, no auth)
 ```
+
+### Stopping / starting a charge
+
+`on stop` reads your active session from the API, so you don't pass any
+arguments — it figures out the EVSE/connector itself:
+
+```sh
+on stop                 # confirms, then stops the session you're charging on
+on stop --yes           # no prompt (for scripts/agents)
+on stop --force         # force-stop by connector (fallback / roaming sessions)
+on stop --json          # → {"stopped":true,"method":"remoteStop","where":"…","result_code":0}
+```
+
+If nothing is charging, `on stop` is a harmless no-op (`{"stopped":false,"reason":"no_active_session"}`).
+
+`on start` needs to identify the charger you're plugged into (you can't auto-detect
+that), so pass its EvseCode + connector id:
+
+```sh
+on start --evse "IS*ONP00091-3253-1" --connector 7890574 --yes
+```
+
+Both are **mutating** and ask for confirmation unless `--yes`. Success is
+`ResultCode == 0`; on failure the CLI surfaces the server's error and (for stop)
+suggests `--force`.
 
 ### Global flags
 
@@ -112,8 +139,6 @@ Android emulator. See `src/lib/api.ts` for the typed client and per-endpoint not
 
 ## Not implemented (yet)
 
-- Remote start/stop charging (`/api/commands/remoteStart|StopTransaction`) — request
-  bodies not yet verified; left out to avoid shipping unverified mutating commands.
 - Payments / saved cards (`/api/creditCards` 404s on ON's deployment; payments flow
   differently).
 - Electronic-ID (OIDC) login.

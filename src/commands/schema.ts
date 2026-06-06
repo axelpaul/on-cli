@@ -98,6 +98,30 @@ const SCHEMAS: Record<string, CommandSchema> = {
 			unpaid_invoices: "number",
 		},
 	},
+	stop: {
+		command: "stop",
+		mutating: true,
+		requires_auth: true,
+		shape: {
+			stopped: "boolean",
+			method: "'remoteStop' | 'forceStop'",
+			where: "string  (location or EvseCode)",
+			result_code: "number | null  (0 = success)",
+			error: "string | null",
+			reason: "'no_active_session' | 'cancelled'  (only when stopped=false without an attempt)",
+		},
+	},
+	start: {
+		command: "start",
+		mutating: true,
+		requires_auth: true,
+		shape: {
+			started: "boolean",
+			charging_authorization_id: "number | null",
+			result_code: "number | null  (0 = success)",
+			error: "string | null",
+		},
+	},
 	keys: {
 		command: "keys",
 		mutating: false,

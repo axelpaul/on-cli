@@ -124,9 +124,57 @@ export interface SessionLocation {
 
 export interface OnlineData {
 	PendingUserRequestsCount?: number;
-	CurrentSessions?: unknown[];
+	CurrentSessions?: CurrentSession[];
 	UpcomingReservations?: unknown[];
 	CouponsCount?: number;
+	[k: string]: unknown;
+}
+
+/** An in-progress charging session (onlineData.CurrentSessions[]).
+ * Stop is built from ChargePoint / Evse / Connector — see api.buildStopTarget. */
+export interface CurrentSession {
+	Location?: { Id?: number; FriendlyName?: string };
+	ChargePoint?: { Id?: number; FriendlyCode?: string };
+	Evse?: { Id?: number; FriendlyCode?: string };
+	Connector?: { Id?: number; Code?: string; Type?: { Id?: number; Title?: string } };
+	/** Present (with an Id, platform ≠ 5) when the session is roaming. */
+	RoamingActor?: { Id?: number; RoamingPlatform?: { Id?: number } } | null;
+	Measurements?: Record<string, unknown>;
+	ChargingSession?: { Id?: number; ChargingFrom?: string };
+	[k: string]: unknown;
+}
+
+/** Request body for remoteStart/StopTransaction (PascalCase keys, verbatim). */
+export interface ChargingCommandBody {
+	EvseCode: string;
+	ConnectorId?: number;
+	ChargePointId?: number;
+	PreauthorizationId?: number;
+	CouponId?: number;
+	EnableLimits?: boolean;
+	EnergyLimits?: number;
+	TimeLimits?: number;
+	SocLimits: boolean;
+}
+
+/** remoteStartTransaction response. ResultCode 0 = success. */
+export interface ChargingCommandResponse {
+	ChargingAuthorizationId?: number;
+	ResultCode?: number;
+	ErrorDescription?: string;
+	[k: string]: unknown;
+}
+
+/** remoteStopTransaction / remoteStopRoaming response. ResultCode 0 = success. */
+export interface StopResponse {
+	ResultCode?: number;
+	ErrorDescription?: string;
+	RateAppNow?: boolean;
+	[k: string]: unknown;
+}
+
+export interface ResultCodeResponse {
+	resultCode?: number;
 	[k: string]: unknown;
 }
 

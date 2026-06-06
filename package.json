@@ -1,6 +1,6 @@
 {
 	"name": "on-cli",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "CLI for the ON (Orka náttúrunnar) EV-charging app — sessions, vehicles, chargers, invoices, and RFID keys from your terminal. AI-agent friendly. Built with Bun.",
 	"module": "src/index.ts",
 	"type": "module",

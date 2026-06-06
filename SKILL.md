@@ -1,6 +1,6 @@
 ---
 name: on
-description: "ON (Orka náttúrunnar) EV-charging CLI. Use whenever the user asks about their ON charging — recent charging sessions, how much a session cost or how many kWh it drew, their EV / vehicle on the account, where to charge (find nearby chargers, what's available right now), their RFID charging keys, or their ON invoices / unpaid bills. ON is an Icelandic charging network; the app is is.on.charge.android (a white-label of Etrel Thor on the Dusky backend at app.on.is). Headless, agent-friendly (JSON output, stable shapes, doctor + schema commands), read-only."
+description: "ON (Orka náttúrunnar) EV-charging CLI. Use whenever the user asks about their ON charging — STOP the charge they have running (or start one), check recent charging sessions, how much a session cost or how many kWh it drew, their EV / vehicle on the account, where to charge (find nearby chargers, what's available right now), their RFID charging keys, or their ON invoices / unpaid bills. ON is an Icelandic charging network; the app is is.on.charge.android (a white-label of Etrel Thor on the Dusky backend at app.on.is). Headless, agent-friendly (JSON output, stable shapes, doctor + schema commands). Read-only except stop/start, which are mutating and confirm first."
 homepage: https://github.com/axelpaul/on-cli
 metadata:
   {
@@ -36,6 +36,8 @@ Use it when the user wants anything about their ON charging from a script/agent 
 
 - **"How much did my last charge cost?"** / **"How many kWh?"** — `on sessions`.
 - **"Show my charging history."** — `on sessions --limit 20`.
+- **"Stop my charge / stop charging."** — `on stop` (the #1 use case; see below).
+- **"Start charging."** — `on start --evse <code> --connector <id>`.
 - **"Am I charging right now?"** — `on live`.
 - **"What car is on my account?"** — `on vehicles`.
 - **"Where can I charge near me / what's free right now?"** — `on locations --available`.
@@ -80,6 +82,24 @@ on invoices --json --limit 10
 on keys --json
 ```
 
+## Stopping a charge (the main use case)
+
+```bash
+on stop --json            # reads the active session, stops it; no args needed
+```
+
+`on stop` calls `/api/onlineData`, takes the active session, and builds the exact
+`remoteStopTransaction` body the app sends (EvseCode = `chargePointCode-evseCode-connectorCode`,
+plus ChargePointId + ConnectorId). It is **mutating** — it prompts for confirmation
+unless `--yes` (always pass `--yes` in an agent/non-TTY context). If nothing is
+charging it's a safe no-op: `{"stopped":false,"reason":"no_active_session"}`. On success:
+`{"stopped":true,"method":"remoteStop","result_code":0}`. If a graceful stop fails, retry
+with `on stop --force` (connector-level force-stop; also used automatically for roaming).
+
+`on start --evse <EvseCode> --connector <id> --yes` starts a charge — but you must supply
+the charger's EvseCode + connector id (the CLI can't know which charger the user is plugged
+into). Don't start a charge unless the user explicitly asked and gave the charger details.
+
 ## Output conventions
 
 - **JSON when stdout is piped**, human-readable in a TTY. Force with `--json` / `--pretty`.
@@ -110,8 +130,8 @@ Money: ISK has no decimals. Energy is in kWh. Timestamps are ISO 8601 (UTC).
 
 ## Not implemented
 
-Remote start/stop charging, payments/saved cards, electronic-ID login, favourites,
-coupons, reservations, helpdesk. The CLI is read-only today.
+Payments/saved cards, electronic-ID login, favourites, coupons, reservations, helpdesk.
+Everything else is read-only except `stop`/`start`.
 
 ## Troubleshooting
 
