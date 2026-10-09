@@ -15,6 +15,7 @@ import type { AuthState, UserConfig } from "./types.ts";
 
 const CONFIG_DIR = join(homedir(), ".config", "on");
 const AUTH_PATH = join(CONFIG_DIR, "auth.json");
+const MONTA_AUTH_PATH = join(CONFIG_DIR, "monta-auth.json");
 const CONFIG_PATH = join(CONFIG_DIR, "config.json");
 
 function ensureDir(): void {
@@ -50,6 +51,21 @@ export function loadAuth(): AuthState | null {
 	return readJson<AuthState>(AUTH_PATH);
 }
 
+export interface MontaAuthState {
+	accessToken: string;
+	uuid: string;
+	loggedInAt: string;
+}
+
+/** Kept separate from the retired Dusky auth cache. */
+export function saveMontaAuth(state: MontaAuthState): void {
+	writeSecure(MONTA_AUTH_PATH, state);
+}
+
+export function loadMontaAuth(): MontaAuthState | null {
+	return readJson<MontaAuthState>(MONTA_AUTH_PATH);
+}
+
 export function clearAuth(): void {
 	if (existsSync(AUTH_PATH)) unlinkSync(AUTH_PATH);
 }
@@ -65,5 +81,6 @@ export function loadConfig(): UserConfig {
 export const paths = {
 	dir: CONFIG_DIR,
 	auth: AUTH_PATH,
+	montaAuth: MONTA_AUTH_PATH,
 	config: CONFIG_PATH,
 };

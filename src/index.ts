@@ -10,6 +10,13 @@ import { liveCommand } from "./commands/live.ts";
 import { locationsCommand } from "./commands/locations.ts";
 import { loginCommand } from "./commands/login.ts";
 import { logoutCommand } from "./commands/logout.ts";
+import {
+	montaAccountCommand,
+	montaChargePointsCommand,
+	montaChargesCommand,
+	montaLoginCommand,
+	montaVehiclesCommand,
+} from "./commands/monta.ts";
 import { schemaCommand } from "./commands/schema.ts";
 import { sessionsCommand } from "./commands/sessions.ts";
 import { startCommand } from "./commands/start.ts";
@@ -70,6 +77,18 @@ const COMMANDS: CommandSpec[] = [
 		usage: "on login [--email <e>] [--password <p>]",
 	},
 	{ name: "logout", description: "Clear the local session." },
+	{
+		name: "monta-login",
+		description:
+			"Log in to ON's current Monta backend (uses $ON_MONTA_USER / $ON_MONTA_PW or a prompt).",
+	},
+	{ name: "monta-account", description: "Read the account from ON's current Monta backend." },
+	{ name: "monta-vehicles", description: "Read vehicles from ON's current Monta backend." },
+	{ name: "monta-charges", description: "Read charges from ON's current Monta backend." },
+	{
+		name: "monta-charge-points",
+		description: "Read charge points from ON's current Monta backend.",
+	},
 	{ name: "whoami", description: "Show the logged-in user." },
 	{ name: "vehicles", description: "List the vehicles on your account." },
 	{
@@ -109,6 +128,7 @@ const COMMANDS: CommandSpec[] = [
 		usage: "on schema [<command>]",
 	},
 	{ name: "version", description: "Print the CLI version." },
+	{ name: "serve", description: "Start the local read-only MCP server over stdio." },
 ];
 
 function printHelp(): void {
@@ -145,6 +165,10 @@ async function main(): Promise<void> {
 	const raw = hasFlag("raw");
 
 	switch (command) {
+		case "serve": {
+			const { serve } = await import("./mcp/server.ts");
+			return serve();
+		}
 		case "login":
 			return loginCommand({
 				email: getFlag("email"),
@@ -153,6 +177,16 @@ async function main(): Promise<void> {
 			});
 		case "logout":
 			return logoutCommand(globalFlags);
+		case "monta-login":
+			return montaLoginCommand({ email: getFlag("email"), ...globalFlags });
+		case "monta-account":
+			return montaAccountCommand(globalFlags);
+		case "monta-vehicles":
+			return montaVehiclesCommand(globalFlags);
+		case "monta-charges":
+			return montaChargesCommand(globalFlags);
+		case "monta-charge-points":
+			return montaChargePointsCommand(globalFlags);
 		case "whoami":
 			return whoamiCommand({ raw, ...globalFlags });
 		case "vehicles":

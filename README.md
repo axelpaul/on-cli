@@ -3,8 +3,14 @@
 Headless CLI for the **ON (Orka náttúrunnar)** EV-charging app — charging sessions,
 vehicles, chargers, invoices, and RFID keys without opening the mobile app.
 
-ON is a white-label of Etrel's "Thor" app on the **Dusky** backend (`app.on.is`).
-AI-agent friendly: JSON output, stable shapes, `doctor` + `schema` commands.
+**Status (October 2026):** ON's current app uses Monta. The original CLI commands
+still target the retired Dusky backend and are not reliable. A separate,
+read-only Monta path is available as `monta-login`, `monta-account`,
+`monta-vehicles`, `monta-charges`, and `monta-charge-points`, plus matching MCP
+tools. Charging controls have **not** been migrated. The Monta session does not
+yet auto-refresh.
+
+AI-agent friendly: JSON output and a local stdio MCP server.
 
 ## Install
 
@@ -14,12 +20,32 @@ Needs [Bun](https://bun.sh/) ≥ 1.3.
 git clone <repo> on-cli && cd on-cli
 bun install
 bun link               # exposes `on` on your PATH
-on login --email you@example.com
+on monta-login --email you@example.com
 ```
 
 Or run without linking: `bun src/index.ts <command>`.
 
 ## Auth
+
+The current Monta path uses the same email/password as the ON app. It requires
+a separate login from the retired Dusky commands:
+
+```sh
+on monta-login --email you@example.com
+on monta-account --json
+on monta-vehicles --json
+on monta-charges --json
+on monta-charge-points --json
+on serve  # stdio MCP: the four corresponding Monta read tools
+```
+
+The Monta access token is cached separately at `~/.config/on/monta-auth.json`
+with mode `0600`. Automatic refresh and token expiry handling are not yet
+implemented; re-run `monta-login` if the server rejects the session. Each login
+may generate a new-device security email from ON.
+
+The following commands document the **retired Dusky path** and are retained
+only for historical reference until migration is complete:
 
 Plain email + password (OAuth2 password grant). No browser, works over SSH.
 
@@ -134,8 +160,10 @@ bun test            # unit tests for pure helpers
 bun run build       # standalone binary at ./on
 ```
 
-The API was reverse-engineered from `is.on.charge.android` v2025.7.5 via mitmproxy on an
-Android emulator. See `src/lib/api.ts` for the typed client and per-endpoint notes.
+The original Dusky API was reverse-engineered from `is.on.charge.android`
+v2025.7.5. The current Monta request path was checked against the Play-installed
+2026 app; see `src/lib/monta.ts`. Do not use the old charging commands against
+the current service.
 
 ## Not implemented (yet)
 
