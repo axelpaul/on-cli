@@ -1,7 +1,20 @@
 {
 	"name": "on-cli",
-	"version": "0.2.0",
-	"description": "CLI for the ON (Orka náttúrunnar) EV-charging app — sessions, vehicles, chargers, invoices, and RFID keys from your terminal. AI-agent friendly. Built with Bun.",
+	"version": "0.3.0",
+	"description": "Unofficial CLI and MCP server for the ON (Orka náttúrunnar) EV-charging network in Iceland — sessions, vehicles, chargers, invoices, RFID keys, start/stop charging.",
+	"license": "MIT",
+	"author": "Axel Paul Gunnarsson",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/axelpaul/on-cli.git"
+	},
+	"homepage": "https://github.com/axelpaul/on-cli#readme",
+	"bugs": {
+		"url": "https://github.com/axelpaul/on-cli/issues"
+	},
+	"engines": {
+		"bun": ">=1.1.0"
+	},
 	"module": "src/index.ts",
 	"type": "module",
 	"private": true,
@@ -11,7 +24,7 @@
 	"scripts": {
 		"start": "bun src/index.ts",
 		"dev": "bun --watch src/index.ts",
-		"build": "bun build --compile src/index.ts --outfile on",
+		"build": "bun build --compile src/index.ts --outfile dist/on",
 		"typecheck": "bunx tsc --noEmit",
 		"lint": "bunx biome check src/",
 		"check": "bun run lint && bun run typecheck && bun run test",
