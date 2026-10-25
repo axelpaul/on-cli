@@ -1,6 +1,6 @@
 ---
 name: on
-description: "ON (Orka náttúrunnar) EV-charging CLI. Use whenever the user asks about their ON charging — STOP the charge they have running (or start one), check recent charging sessions, how much a session cost or how many kWh it drew, their EV / vehicle on the account, where to charge (find nearby chargers, what's available right now), their RFID charging keys, or their ON invoices / unpaid bills. ON is an Icelandic charging network; the app is is.on.charge.android (a white-label of Etrel Thor on the Dusky backend at app.on.is). Headless, agent-friendly (JSON output, stable shapes, doctor + schema commands). Read-only except stop/start, which are mutating and confirm first."
+description: "ON (Orka náttúrunnar) EV-charging CLI. Use whenever the user asks about their ON charging — STOP the charge they have running (or start one), check recent charging sessions, how much a session cost or how many kWh it drew, their EV / vehicle on the account, where to charge (find nearby chargers, what's available right now), their RFID charging keys, or their ON invoices / unpaid bills. ON is an Icelandic charging network; its current app runs on Monta (monta-* commands), the older Dusky backend at app.on.is (other commands) is being retired. Headless, agent-friendly (JSON output, stable shapes, doctor + schema commands). Read-only except stop/start, which are mutating and confirm first."
 homepage: https://github.com/axelpaul/on-cli
 metadata:
   {
@@ -11,14 +11,10 @@ metadata:
         "install":
           [
             {
-              "id": "git",
+              "id": "bun",
               "kind": "manual",
-              "label": "Clone + bun link",
-              "steps":
-                [
-                  "git clone https://github.com/axelpaul/on-cli ~/code/on-cli",
-                  "cd ~/code/on-cli && bun install && bun link",
-                ],
+              "label": "Install with Bun",
+              "steps": ["bun add -g github:axelpaul/on-cli"],
             },
           ],
       },
@@ -27,8 +23,14 @@ metadata:
 
 # on
 
-Headless CLI for the **ON (Orka náttúrunnar)** Icelandic EV-charging app
-(`is.on.charge.android`, a white-label of Etrel "Thor" on the Dusky API at `app.on.is`).
+Headless CLI for the **ON (Orka náttúrunnar)** Icelandic EV-charging app. Unofficial.
+
+**Backends (October 2026):** ON's current app uses **Monta**. The read-only Monta
+commands are `on monta-account`, `on monta-vehicles`, `on monta-charges`,
+`on monta-charge-points` (login: `on monta-login`). All other commands target the
+legacy Etrel "Thor"/Dusky API at `app.on.is`, which is being retired and may fail;
+start/stop charging has not been migrated to Monta yet. Prefer the Monta commands for
+account, vehicle and charge-history questions.
 
 ## What this is good for
 
@@ -50,7 +52,7 @@ Use it when the user wants anything about their ON charging from a script/agent 
 on doctor --json
 ```
 
-`status` is `ok` / `warn` / `fail`. On `fail` ("Not logged in"), the user must run
+(`doctor` checks the legacy session only.) `status` is `ok` / `warn` / `fail`. On `fail` ("Not logged in"), the user must run
 `on login` themselves (it needs their ON email + password). **Do not run `on login`
 autonomously unless `$ON_USER` and `$ON_PW` are already set in the environment** — never
 ask for or hardcode a password.
@@ -73,7 +75,7 @@ Shapes are hand-curated and match the real `--json` output — treat them as the
 ```bash
 on doctor --json
 on sessions --json --limit 5
-on sessions --id 26761589 --json     # one session in full
+on sessions --id 12345 --json        # one session in full
 on live --json                       # charging now? reservations? unpaid count?
 on vehicles --json
 on locations --json --available      # chargers free right now (near Reykjavík by default)
@@ -125,8 +127,13 @@ Money: ISK has no decimals. Energy is in kWh. Timestamps are ISO 8601 (UTC).
 
 - **Don't run `on login` interactively in an autonomous loop** — it needs a password.
   Only run it non-interactively when `$ON_USER`/`$ON_PW` are already set.
-- **Don't print or store `~/.config/on/auth.json`** — it holds the bearer + refresh token.
+- **Don't print or store `auth.json` / `monta-auth.json`** (in `~/.config/on-cli/`) — they hold bearer tokens.
 - **Don't poll `on live` more than ~once a minute.**
+
+## MCP
+
+`on serve` exposes the same operations as MCP tools (see README). `start_charging` /
+`stop_charging` only exist when `ON_MCP_ENABLE_WRITES=1` and need `confirm: true`.
 
 ## Not implemented
 
