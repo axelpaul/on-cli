@@ -1,14 +1,9 @@
 // on locations — find charging locations near a point. Public (no auth needed).
 // Defaults to central Reykjavík if no coordinates are given.
 
-import { OnClient } from "../lib/api.ts";
-import { addressLine } from "../lib/format.ts";
+import { DEFAULT_LAT, DEFAULT_LNG, DEFAULT_RADIUS_KM, findLocations } from "../lib/actions.ts";
 import { color, die, isJsonMode, printJson } from "../lib/output.ts";
-import { loadConfig } from "../lib/storage.ts";
-
-// Central Reykjavík (Hallgrímskirkja-ish) — a sensible default for an Iceland app.
-const DEFAULT_LAT = 64.1466;
-const DEFAULT_LNG = -21.9426;
+import { publicClient } from "../lib/session.ts";
 
 interface LocationsFlags {
 	lat?: string;
@@ -31,44 +26,24 @@ function num(v: string | undefined, fallback: number, json: boolean, name: strin
 
 export async function locationsCommand(flags: LocationsFlags): Promise<void> {
 	const json = isJsonMode(flags);
-	const client = new OnClient({ baseUrl: loadConfig().baseUrl });
+	const client = publicClient();
 
 	const lat = num(flags.lat, DEFAULT_LAT, json, "lat");
 	const lng = num(flags.lng, DEFAULT_LNG, json, "lng");
-	const radius = num(flags.radius, 25, json, "radius");
-
-	const locations = await client.getLocations({
-		lat,
-		lng,
-		radius,
-		available: flags.available,
-		free: flags.free,
-	});
+	const radius = num(flags.radius, DEFAULT_RADIUS_KM, json, "radius");
+	const query = { lat, lng, radius, available: flags.available, free: flags.free };
 
 	if (flags.raw) {
-		printJson(locations);
+		printJson(await client.getLocations(query));
 		return;
 	}
 
-	const limit = flags.limit ? Math.max(0, Number.parseInt(flags.limit, 10)) : 25;
-	const rows = locations.slice(0, limit).map((l) => ({
-		id: l.Id,
-		name: l.FriendlyName ?? l.FriendlyCode ?? null,
-		address: addressLine(l.Address),
-		available_evses: l.AvailableEvses ?? null,
-		total_evses: l.TotalEvses ?? null,
-		lat: l.GeoCoordinates?.GPSLatitude ?? null,
-		lng: l.GeoCoordinates?.GPSLongitude ?? null,
-		private: l.IsPrivate ?? false,
-	}));
+	const limit = flags.limit ? Number.parseInt(flags.limit, 10) || 0 : 25;
+	const out = await findLocations(client, query, limit);
+	const rows = out.locations;
 
 	if (json) {
-		printJson({
-			query: { lat, lng, radius },
-			count: locations.length,
-			returned: rows.length,
-			locations: rows,
-		});
+		printJson(out);
 		return;
 	}
 	if (rows.length === 0) {
@@ -84,7 +59,7 @@ export async function locationsCommand(flags: LocationsFlags): Promise<void> {
 		console.log(`${color.bold(l.name ?? `#${l.id}`)}  ${tag}`);
 		console.log(`  ${color.dim(l.address)}`);
 	}
-	if (locations.length > rows.length) {
-		console.log(color.dim(`\n${rows.length} of ${locations.length} — use --limit to see more.`));
+	if (out.count > rows.length) {
+		console.log(color.dim(`\n${rows.length} of ${out.count} — use --limit to see more.`));
 	}
 }

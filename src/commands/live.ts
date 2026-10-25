@@ -2,6 +2,7 @@
 // and the account's pending-request / unpaid-invoice / coupon counters.
 // Combines /api/onlineData + /api/periodicData into one agent-friendly snapshot.
 
+import { liveStatus } from "../lib/actions.ts";
 import { AuthError } from "../lib/api.ts";
 import { color, dieAuth, isJsonMode, printJson } from "../lib/output.ts";
 import { authedClient } from "../lib/session.ts";
@@ -15,21 +16,15 @@ export async function liveCommand(flags: {
 	const client = authedClient(json);
 
 	try {
-		const [online, periodic] = await Promise.all([
-			client.getOnlineData(),
-			client.getPeriodicData(),
-		]);
 		if (flags.raw) {
+			const [online, periodic] = await Promise.all([
+				client.getOnlineData(),
+				client.getPeriodicData(),
+			]);
 			printJson({ onlineData: online, periodicData: periodic });
 			return;
 		}
-		const out = {
-			current_sessions: online.CurrentSessions ?? [],
-			upcoming_reservations: online.UpcomingReservations ?? [],
-			coupons: online.CouponsCount ?? 0,
-			pending_requests: periodic.PendingUserRequestsCount ?? online.PendingUserRequestsCount ?? 0,
-			unpaid_invoices: periodic.UnpaidInvoicesCount ?? 0,
-		};
+		const out = await liveStatus(client);
 		if (json) {
 			printJson(out);
 			return;

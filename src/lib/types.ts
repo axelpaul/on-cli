@@ -12,7 +12,7 @@ export interface TokenResponse {
 	".expires"?: string; // RFC1123 — the real access-token expiry (~1h)
 }
 
-/** Persisted auth state in ~/.config/on/auth.json (0600). */
+/** Persisted auth state in <config dir>/auth.json (0600); see storage.ts. */
 export interface AuthState {
 	accessToken: string;
 	refreshToken?: string;

@@ -6,16 +6,15 @@
 //
 // EvseCode format (non-roaming ON): `${chargePointFriendlyCode}-${evseFriendlyCode}-${connectorCode}`.
 
+import { startCharging } from "../lib/actions.ts";
 import { AuthError } from "../lib/api.ts";
 import { color, die, dieAuth, isJsonMode, printJson } from "../lib/output.ts";
 import { confirm } from "../lib/prompt.ts";
 import { authedClient } from "../lib/session.ts";
-import type { ChargingCommandBody } from "../lib/types.ts";
 
 interface StartFlags {
 	evse?: string;
 	connector?: string;
-	chargepoint?: string;
 	preauth?: string;
 	coupon?: string;
 	yes?: boolean;
@@ -39,12 +38,11 @@ export async function startCommand(flags: StartFlags): Promise<void> {
 	const connector = intFlag(flags.connector, "connector", json);
 	if (connector === undefined) die("Missing --connector <id>.", 64, json);
 
-	const body: ChargingCommandBody = {
-		EvseCode: flags.evse,
-		ConnectorId: connector,
-		PreauthorizationId: intFlag(flags.preauth, "preauth", json),
-		CouponId: intFlag(flags.coupon, "coupon", json),
-		SocLimits: false,
+	const input = {
+		evse: flags.evse,
+		connector,
+		preauth: intFlag(flags.preauth, "preauth", json),
+		coupon: intFlag(flags.coupon, "coupon", json),
 	};
 
 	const client = authedClient(json);
@@ -63,26 +61,18 @@ export async function startCommand(flags: StartFlags): Promise<void> {
 	}
 
 	try {
-		const res = await client.startCharging(body);
-		const success = res.ResultCode === 0 || res.ResultCode === undefined;
+		const res = await startCharging(client, input);
 		if (json) {
-			printJson({
-				started: success,
-				charging_authorization_id: res.ChargingAuthorizationId ?? null,
-				result_code: res.ResultCode ?? null,
-				error: res.ErrorDescription ?? null,
-			});
-			if (!success) process.exit(1);
+			printJson(res);
+			if (!res.started) process.exit(1);
 			return;
 		}
-		if (success) {
+		if (res.started) {
 			console.log(color.green(`✓ Start command sent for ${flags.evse}.`));
 			console.log(color.dim("  Check `on live` in a few seconds."));
 		} else {
 			console.log(
-				color.red(
-					`✗ Start failed${res.ErrorDescription ? `: ${res.ErrorDescription}` : ` (code ${res.ResultCode})`}.`,
-				),
+				color.red(`✗ Start failed${res.error ? `: ${res.error}` : ` (code ${res.result_code})`}.`),
 			);
 			process.exit(1);
 		}

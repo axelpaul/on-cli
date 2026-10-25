@@ -1,5 +1,6 @@
 // on keys — your ON RFID charging keys/cards (identifications).
 
+import { listKeys } from "../lib/actions.ts";
 import { AuthError } from "../lib/api.ts";
 import { dateOnly } from "../lib/format.ts";
 import { color, dieAuth, isJsonMode, printJson } from "../lib/output.ts";
@@ -14,28 +15,20 @@ export async function keysCommand(flags: {
 	const client = authedClient(json);
 
 	try {
-		const cards = await client.getRfidCards();
 		if (flags.raw) {
-			printJson(cards);
+			printJson(await client.getRfidCards());
 			return;
 		}
-		const out = cards.map((c) => ({
-			id: c.Id,
-			number: c.Number ?? null,
-			code: c.Code ?? null,
-			valid_from: c.ValidFrom ?? null,
-			blocked: c.Blocked ?? false,
-			expired: c.Expired ?? false,
-		}));
+		const out = await listKeys(client);
 		if (json) {
-			printJson({ keys: out });
+			printJson(out);
 			return;
 		}
-		if (out.length === 0) {
+		if (out.keys.length === 0) {
 			console.log(color.dim("No RFID keys on this account."));
 			return;
 		}
-		for (const c of out) {
+		for (const c of out.keys) {
 			const flags2 = [
 				c.blocked ? color.red("blocked") : null,
 				c.expired ? color.dim("expired") : null,

@@ -1,5 +1,6 @@
 // on vehicles — the vehicles on your account.
 
+import { listVehicles } from "../lib/actions.ts";
 import { AuthError } from "../lib/api.ts";
 import { color, dieAuth, isJsonMode, printJson } from "../lib/output.ts";
 import { authedClient } from "../lib/session.ts";
@@ -13,32 +14,20 @@ export async function vehiclesCommand(flags: {
 	const client = authedClient(json);
 
 	try {
-		const vehicles = await client.getVehicles();
 		if (flags.raw) {
-			printJson(vehicles);
+			printJson(await client.getVehicles());
 			return;
 		}
-		const out = vehicles.map((v) => ({
-			id: v.Id,
-			brand: v.VehicleBrand?.Title ?? null,
-			model: v.VehicleModel?.Title ?? null,
-			version: v.VersionTitle ?? null,
-			year_from: v.YearFrom ?? null,
-			is_default: v.IsDefaultVehicle ?? false,
-			battery_kwh: v.BatteryCapacity ?? null,
-			range_km: v.MaximumRange ?? null,
-			ac_connector: v.ACconnectorType?.Title ?? null,
-			ac_max_power_kw: v.ACMaxPower ?? null,
-		}));
+		const out = await listVehicles(client);
 		if (json) {
-			printJson({ vehicles: out });
+			printJson(out);
 			return;
 		}
-		if (out.length === 0) {
+		if (out.vehicles.length === 0) {
 			console.log(color.dim("No vehicles on this account."));
 			return;
 		}
-		for (const v of out) {
+		for (const v of out.vehicles) {
 			const star = v.is_default ? color.yellow(" ★") : "";
 			console.log(`${color.bold(`${v.brand ?? "?"} ${v.model ?? ""}`.trim())}${star}`);
 			console.log(

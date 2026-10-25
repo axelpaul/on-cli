@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import pkg from "../../package.json" with { type: "json" };
 import type { MontaAuthState } from "./storage.ts";
 
 const BASE_URL = "https://api.monta.app";
@@ -32,7 +33,7 @@ export class MontaClient {
 		headers.set("UUID", this.uuid);
 		headers.set("Timezone", "Atlantic/Reykjavik");
 		headers.set("Accept-Language", "en");
-		headers.set("User-Agent", "on-cli/0.3.0");
+		headers.set("User-Agent", `on-cli/${pkg.version}`);
 		if (this.accessToken) headers.set("Authorization", `Bearer ${this.accessToken}`);
 		const response = await fetch(`${BASE_URL}${path}`, {
 			...options,

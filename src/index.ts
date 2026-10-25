@@ -128,7 +128,10 @@ const COMMANDS: CommandSpec[] = [
 		usage: "on schema [<command>]",
 	},
 	{ name: "version", description: "Print the CLI version." },
-	{ name: "serve", description: "Start the local read-only MCP server over stdio." },
+	{
+		name: "serve",
+		description: "Start the MCP server over stdio (writes need ON_MCP_ENABLE_WRITES=1).",
+	},
 ];
 
 function printHelp(): void {
@@ -201,7 +204,6 @@ async function main(): Promise<void> {
 			return startCommand({
 				evse: getFlag("evse"),
 				connector: getFlag("connector"),
-				chargepoint: getFlag("chargepoint"),
 				preauth: getFlag("preauth"),
 				coupon: getFlag("coupon"),
 				yes: hasFlag("yes"),

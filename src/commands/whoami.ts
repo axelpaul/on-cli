@@ -1,5 +1,6 @@
 // on whoami — the logged-in user (live from /api/users/me).
 
+import { summarizeAccount } from "../lib/actions.ts";
 import { AuthError } from "../lib/api.ts";
 import { color, dieAuth, isJsonMode, printJson } from "../lib/output.ts";
 import { authedClient } from "../lib/session.ts";
@@ -18,20 +19,7 @@ export async function whoamiCommand(flags: {
 			printJson(me);
 			return;
 		}
-		const u = me.User;
-		const out = {
-			user_id: u?.Id,
-			name: [u?.FirstName, u?.LastName].filter(Boolean).join(" ").trim() || null,
-			email: u?.Email ?? null,
-			kennitala: u?.ExternalCode ?? null,
-			phone: u?.GSMNumber ?? null,
-			country: u?.Address?.Country?.Code ?? null,
-			currency: u?.Currency?.CodeShort ?? null,
-			language: u?.UiCulture?.Id ?? null,
-			user_type: u?.UserType?.Title ?? null,
-			registered: u?.RegistrationDate ?? null,
-			blocked: u?.Blocked ?? null,
-		};
+		const out = summarizeAccount(me);
 		if (json) {
 			printJson(out);
 			return;

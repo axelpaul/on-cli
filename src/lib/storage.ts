@@ -1,4 +1,6 @@
-// Auth + config persistence in ~/.config/on/ with 0600 perms.
+// Auth + config persistence with 0600 perms.
+// Location: $XDG_CONFIG_HOME/on-cli/ (default ~/.config/on-cli/). Older installs
+// used ~/.config/on/; that directory is still used if it exists and the new one doesn't.
 
 import {
 	chmodSync,
@@ -13,7 +15,16 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { AuthState, UserConfig } from "./types.ts";
 
-const CONFIG_DIR = join(homedir(), ".config", "on");
+export function resolveConfigDir(env: NodeJS.ProcessEnv = process.env): string {
+	const base = env.XDG_CONFIG_HOME || join(homedir(), ".config");
+	const dir = join(base, "on-cli");
+	const legacy = join(base, "on");
+	if (!existsSync(dir) && existsSync(join(legacy, "auth.json"))) return legacy;
+	if (!existsSync(dir) && existsSync(join(legacy, "monta-auth.json"))) return legacy;
+	return dir;
+}
+
+const CONFIG_DIR = resolveConfigDir();
 const AUTH_PATH = join(CONFIG_DIR, "auth.json");
 const MONTA_AUTH_PATH = join(CONFIG_DIR, "monta-auth.json");
 const CONFIG_PATH = join(CONFIG_DIR, "config.json");
