@@ -48,6 +48,12 @@ export async function montaChargesCommand(flags: Flags): Promise<void> {
 	printJson(await authedMonta(isJsonMode(flags)).getCharges());
 }
 
-export async function montaChargePointsCommand(flags: Flags): Promise<void> {
-	printJson(await authedMonta(isJsonMode(flags)).getChargePoints());
+export async function montaChargePointsCommand(flags: Flags & { id?: string }): Promise<void> {
+	const client = authedMonta(isJsonMode(flags));
+	if (flags.id !== undefined) {
+		const id = Number(flags.id);
+		if (!Number.isSafeInteger(id) || id <= 0)
+			die("Invalid --id <Monta charge-point ID>", 64, isJsonMode(flags));
+		printJson(await client.getChargePoint(id));
+	} else printJson(await client.getChargePoints());
 }

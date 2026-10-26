@@ -14,6 +14,8 @@ test("ON MCP exposes only read tools", async () => {
 			}),
 		);
 		expect((await client.listTools()).tools.map((tool) => tool.name).sort()).toEqual([
+			"charge_preview",
+			"charging_status",
 			"monta_account",
 			"monta_charge_points",
 			"monta_charges",

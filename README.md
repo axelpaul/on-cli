@@ -1,3 +1,16 @@
+## Current Monta charging state and limits
+
+[MCP setup and client configuration](MCP.md)
+
+- `on live --json`: active Monta sessions, exact string IDs, delivered kWh, current cost, and tariff. Battery percentage stays null when Monta does not supply it. Read-only MCP `charging_status` provides the same result.
+- `on start --chargepoint 'IS*ONP00066-52431-1-1' --json`: **read-only preflight**, including unfamiliar locations. Full ON QR codes resolve through ON's public `https://app.on.is/d/<QR>` page to the official Monta checkout ID; the CLI then revalidates the live connector name and ON operator. No credentials are sent to the public page. Untrusted/ambiguous links and mismatched live identities fail explicitly. Plain connector labels retain account-history/same-pole-group lookup; use the full QR for unfamiliar poles. No internal ID is guessed from the printed number.
+- `on start --chargepoint 6440032 --json`: preflight by known internal ID, showing tariff including minute fees, required hold, account payment readiness, active-session blockers, and official checkout URL. MCP `charge_preview` is also read-only.
+- `--yes` cannot start an already-active/unavailable connector. Free charging and the server-default saved-source route (`payment_method=source`, `payment_method_type=team-wallet`, `has_source=true`, `has_payment=true`) may start. This saved-card path was live-proved on 2026-10-21: the backend accepted a real start and reported card payment. Stale UI settings may still say Apple Pay; the server route is authoritative. Other payment routes return `INTERACTIVE_PAYMENT_REQUIRED` and the official checkout URL. No retries or reused payment authorizations.
+
+**Remaining limits:** QR codes not recognised by ON’s public resolver, interactive Apple Pay/3-D Secure automation, and legacy location commands. Monta stop has not been live-tested. Accepted start requests must be followed by read-only session verification; `starting` is not proof of energy delivery.
+
+
+
 # on-cli
 
 Headless CLI for the **ON (Orka náttúrunnar)** EV-charging app — charging sessions,
@@ -73,7 +86,7 @@ on whoami                                  the logged-in user
 on vehicles                                vehicles on your account
 on sessions [--limit N] [--id <id>]        charging history (or one session in full)
 on live                                     active sessions, reservations, counters
-on stop [--force] [--yes]                   stop the active charging session (mutating)
+on stop [--connector <id>] [--force] [--yes] stop an active charging session (mutating)
 on start --evse <code> --connector <id> [--yes]   start charging (mutating)
 on keys                                     your RFID charging keys/cards
 on invoices [--limit N]                     your invoices
@@ -88,12 +101,13 @@ arguments — it figures out the EVSE/connector itself:
 
 ```sh
 on stop                 # confirms, then stops the session you're charging on
-on stop --yes           # no prompt (for scripts/agents)
-on stop --force         # force-stop by connector (fallback / roaming sessions)
+on stop --yes           # no prompt (for scripts/agents; only if exactly one session is active)
+on stop --connector 7890574 --yes  # explicitly select one if more than one is active
+on stop --force         # force-stop by connector (explicit fallback only)
 on stop --json          # → {"stopped":true,"method":"remoteStop","where":"…","result_code":0}
 ```
 
-If nothing is charging, `on stop` is a harmless no-op (`{"stopped":false,"reason":"no_active_session"}`).
+If nothing is charging, `on stop` is a harmless no-op (`{"stopped":false,"reason":"no_active_session"}`). If more than one session is active, it refuses to guess; select the intended connector with `--connector`.
 
 `on start` needs to identify the charger you're plugged into (you can't auto-detect
 that), so pass its EvseCode + connector id:
@@ -102,7 +116,7 @@ that), so pass its EvseCode + connector id:
 on start --evse "IS*ONP00091-3253-1" --connector 7890574 --yes
 ```
 
-Both are **mutating** and ask for confirmation unless `--yes`. Success is
+Both are **mutating** and ask for confirmation unless `--yes`. A normal ON session uses `remoteStopTransaction`; a roaming session uses the app-native `remoteStopRoaming`. `--force` uses the connector-level fallback only when explicitly requested. Success is
 `ResultCode == 0`; on failure the CLI surfaces the server's error and (for stop)
 suggests `--force`.
 
@@ -171,3 +185,17 @@ the current service.
   differently).
 - Electronic-ID (OIDC) login.
 - Favourite locations, coupons, helpdesk, reservations.
+
+MCP Monta start/stop adapters are available under explicit startup opt-in and
+per-call confirmation. The server-default saved-card start route is live-proved;
+interactive payment and payment-method setup are not automated. See [MCP.md](MCP.md) for exact-ID and verification limits.
+
+Charging verification note (2026-10-21): the saved-source start request was accepted and identified card payment, but that physical session ended with StartTransactionTimeout and 0 kWh. This verifies request acceptance, not end-to-end energy delivery. A user-requested retry was blocked by the connector remaining busy; no second start was sent.
+
+## Unfamiliar QR lookup — 2026-10-22
+
+ON’s public QR route resolves a full printed code, including its network prefix.
+For example, `IS*ONP00066-52431-1-1` resolves to **ON 52431-1, Nauthólsvegur 52**.
+Lookup/preview never starts a charge. Starting still requires `--yes` and a
+fresh availability/payment preflight. This feature was verified with read-only
+lookups; no charging mutation was used during its implementation.

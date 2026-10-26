@@ -102,13 +102,13 @@ const COMMANDS: CommandSpec[] = [
 	},
 	{
 		name: "stop",
-		description: "Stop the active charging session (mutating; asks to confirm unless --yes).",
-		usage: "on stop [--force] [--yes]",
+		description: "Stop an active charging session (mutating; asks to confirm unless --yes).",
+		usage: "on stop [--connector <id>] [--force] [--yes]",
 	},
 	{
 		name: "start",
-		description: "Start charging at an EVSE (mutating; needs --evse + --connector).",
-		usage: "on start --evse <code> --connector <id> [--preauth <id>] [--coupon <id>] [--yes]",
+		description: "Preview/start on Monta (needs --chargepoint; --yes executes).",
+		usage: "on start --chargepoint <Monta ID or full QR/label> [--yes]",
 	},
 	{ name: "keys", description: "Your ON RFID charging keys/cards." },
 	{
@@ -186,7 +186,7 @@ async function main(): Promise<void> {
 		case "monta-charges":
 			return montaChargesCommand(globalFlags);
 		case "monta-charge-points":
-			return montaChargePointsCommand(globalFlags);
+			return montaChargePointsCommand({ id: getFlag("id"), ...globalFlags });
 		case "whoami":
 			return whoamiCommand({ raw, ...globalFlags });
 		case "vehicles":
@@ -196,7 +196,12 @@ async function main(): Promise<void> {
 		case "live":
 			return liveCommand({ raw, ...globalFlags });
 		case "stop":
-			return stopCommand({ force: hasFlag("force"), yes: hasFlag("yes"), ...globalFlags });
+			return stopCommand({
+				connector: getFlag("connector"),
+				force: hasFlag("force"),
+				yes: hasFlag("yes"),
+				...globalFlags,
+			});
 		case "start":
 			return startCommand({
 				evse: getFlag("evse"),
