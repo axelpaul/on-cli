@@ -13,8 +13,16 @@ import type { StopResponse } from "../lib/types.ts";
 interface StopFlags {
 	yes?: boolean;
 	force?: boolean;
+	/** Select one active session when an account has more than one. */
+	connector?: string;
 	json?: boolean;
 	pretty?: boolean;
+}
+
+function connectorIdFlag(value: string | undefined, json: boolean): number | undefined {
+	if (value === undefined) return undefined;
+	if (!/^\d+$/.test(value)) die(`Invalid --connector: ${value}`, 64, json);
+	return Number(value);
 }
 
 function ok(r: StopResponse): boolean {
@@ -24,6 +32,9 @@ function ok(r: StopResponse): boolean {
 
 export async function stopCommand(flags: StopFlags): Promise<void> {
 	const json = isJsonMode(flags);
+	// Validate before consulting the account, so a bad selector never looks
+	// indistinguishable from a harmless no-active-session result.
+	const requestedConnector = connectorIdFlag(flags.connector, json);
 	const client = authedClient(json);
 
 	let online: Awaited<ReturnType<typeof client.getOnlineData>>;
@@ -35,7 +46,25 @@ export async function stopCommand(flags: StopFlags): Promise<void> {
 	}
 
 	const sessions = online.CurrentSessions ?? [];
-	const session = sessions[0];
+	let session: (typeof sessions)[number] | undefined;
+	if (requestedConnector !== undefined) {
+		session = sessions.find((candidate) => candidate.Connector?.Id === requestedConnector);
+		if (!session) {
+			die(
+				`No active session found for connector ${requestedConnector}. Check \`on live\` and retry.`,
+				1,
+				json,
+			);
+		}
+	} else if (sessions.length === 1) {
+		session = sessions[0];
+	} else if (sessions.length > 1) {
+		die(
+			`Found ${sessions.length} active charging sessions. Refusing to choose one; re-run with --connector <id>.`,
+			1,
+			json,
+		);
+	}
 	if (!session) {
 		if (json) printJson({ stopped: false, reason: "no_active_session" });
 		else console.log(color.dim("No active charging session — nothing to stop."));
@@ -59,12 +88,37 @@ export async function stopCommand(flags: StopFlags): Promise<void> {
 	}
 
 	try {
-		// Roaming sessions can't use remoteStopTransaction; force-stop by connector.
-		if (flags.force || isRoamingSession(session)) {
+		// Force stop is a deliberate fallback. It is more abrupt than the
+		// app-native normal/roaming remote-stop commands.
+		if (flags.force) {
 			if (target.connectorId == null) die("No connector id on the active session.", 1, json);
 			const res = await client.stopChargingForce(target.connectorId);
 			const success = res.resultCode === 0 || res.resultCode === undefined;
 			report(success, { method: "forceStop", where, result_code: res.resultCode }, json);
+			return;
+		}
+		if (isRoamingSession(session)) {
+			if (target.roamingPlatformId == null) {
+				die(
+					"Active roaming session is missing its platform id; retry with --force only if intended.",
+					1,
+					json,
+				);
+			}
+			const res = await client.stopChargingRoaming({
+				EvseCode: target.body.EvseCode,
+				RoamingPlatformId: target.roamingPlatformId,
+			});
+			report(
+				ok(res),
+				{
+					method: "remoteStopRoaming",
+					where,
+					result_code: res.ResultCode,
+					error: res.ErrorDescription ?? null,
+				},
+				json,
+			);
 			return;
 		}
 		const res = await client.stopCharging(target.body);

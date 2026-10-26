@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { defaultBaseUrl, paged, USER_AGENT } from "./api.ts";
+import { buildStopTarget, defaultBaseUrl, isRoamingSession, paged, USER_AGENT } from "./api.ts";
 
 describe("defaultBaseUrl", () => {
 	test("falls back to production", () => {
@@ -36,5 +36,34 @@ describe("paged", () => {
 describe("USER_AGENT", () => {
 	test("matches the app's UA (required by the WAF)", () => {
 		expect(USER_AGENT).toContain("is.on.charge.android");
+	});
+});
+
+describe("buildStopTarget", () => {
+	test("uses the ON compound EVSE code for a normal session", () => {
+		const target = buildStopTarget({
+			ChargePoint: { Id: 10, FriendlyCode: "CP" },
+			Evse: { FriendlyCode: "EVSE" },
+			Connector: { Id: 20, Code: "1" },
+		});
+		expect(target.roaming).toBe(false);
+		expect(target.body).toEqual({
+			EvseCode: "CP-EVSE-1",
+			ChargePointId: 10,
+			ConnectorId: 20,
+			SocLimits: false,
+		});
+	});
+
+	test("preserves the roaming platform for the app-native stop endpoint", () => {
+		const session = {
+			Evse: { FriendlyCode: "IS*ROAM*1" },
+			Connector: { Id: 20 },
+			RoamingActor: { Id: 4, RoamingPlatform: { Id: 9 } },
+		};
+		const target = buildStopTarget(session);
+		expect(isRoamingSession(session)).toBe(true);
+		expect(target.body.EvseCode).toBe("IS*ROAM*1");
+		expect(target.roamingPlatformId).toBe(9);
 	});
 });

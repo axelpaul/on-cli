@@ -157,6 +157,12 @@ export interface ChargingCommandBody {
 	SocLimits: boolean;
 }
 
+/** App-native body for stopping a roaming session. */
+export interface RoamingChargingCommandStopBody {
+	EvseCode: string;
+	RoamingPlatformId: number;
+}
+
 /** remoteStartTransaction response. ResultCode 0 = success. */
 export interface ChargingCommandResponse {
 	ChargingAuthorizationId?: number;

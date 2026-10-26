@@ -1,9 +1,9 @@
 // on doctor — pre-flight health check. Agents (and humans) should run this
 // before issuing data commands to confirm the CLI is ready.
 
-import { AuthError, OnClient } from "../lib/api.ts";
+import { MontaClient } from "../lib/monta.ts";
 import { color, isJsonMode, printJson } from "../lib/output.ts";
-import { loadAuth, loadConfig, saveAuth } from "../lib/storage.ts";
+import { loadMontaAuth } from "../lib/storage.ts";
 
 type CheckStatus = "ok" | "warn" | "fail";
 interface Check {
@@ -16,74 +16,41 @@ export async function doctorCommand(flags: { json?: boolean; pretty?: boolean })
 	const json = isJsonMode(flags);
 	const checks: Check[] = [];
 
-	const auth = loadAuth();
+	const auth = loadMontaAuth();
 	if (!auth?.accessToken) {
-		checks.push({ name: "auth", status: "fail", detail: "Not logged in. Run `on login`." });
+		checks.push({
+			name: "monta_auth",
+			status: "fail",
+			detail: "No cached Monta session. Run on monta-login locally.",
+		});
 		return report(checks, json);
 	}
-	checks.push({
-		name: "auth",
-		status: "ok",
-		detail: `Token cached, user: ${auth.user?.name ?? auth.user?.email ?? "?"}`,
-	});
-
-	// Token expiry vs the cached `.expires`.
-	if (auth.expiresAt) {
-		const exp = Date.parse(auth.expiresAt);
-		if (Number.isFinite(exp)) {
-			const mins = Math.round((exp - Date.now()) / 60000);
-			if (mins < 0 && !auth.refreshToken) {
-				checks.push({
-					name: "token_expiry",
-					status: "warn",
-					detail: `Expired ${-mins}m ago; no refresh token — re-login may be needed.`,
-				});
-			} else if (mins < 0) {
-				checks.push({
-					name: "token_expiry",
-					status: "ok",
-					detail: "Access token expired but a refresh token is available (auto-refresh).",
-				});
-			} else {
-				checks.push({
-					name: "token_expiry",
-					status: "ok",
-					detail: `~${mins}m remaining${auth.refreshToken ? " (auto-refresh on)" : ""}.`,
-				});
-			}
-		}
-	} else {
-		checks.push({ name: "token_expiry", status: "warn", detail: "No expiry recorded." });
-	}
-
-	// Live reachability via /api/users/me (cheap, exercises auto-refresh).
-	const client = OnClient.fromAuth(auth, {
-		baseUrl: loadConfig().baseUrl,
-		onRefresh: (next) => saveAuth({ ...next, user: next.user ?? auth.user }),
-	});
 	try {
-		const me = await client.getMe();
-		const name = [me.User?.FirstName, me.User?.LastName].filter(Boolean).join(" ").trim();
+		await new MontaClient(auth).getMe();
 		checks.push({
-			name: "api_reachable",
+			name: "monta_auth_api",
 			status: "ok",
-			detail: `GET /api/users/me ok${name ? ` as ${name}` : ""}`,
+			detail: "Cached session accepted by current API; no login attempted.",
 		});
 	} catch (e) {
-		if (e instanceof AuthError) {
-			checks.push({
-				name: "api_reachable",
-				status: "fail",
-				detail: "Server rejected the token (401). Run `on login`.",
-			});
-		} else {
-			checks.push({
-				name: "api_reachable",
-				status: "fail",
-				detail: e instanceof Error ? e.message : String(e),
-			});
-		}
+		checks.push({
+			name: "monta_auth_api",
+			status: "fail",
+			detail: e instanceof Error ? e.message : "Read failed",
+		});
 	}
+	checks.push({
+		name: "paid_start",
+		status: "warn",
+		detail:
+			"Server-default saved-source/card start live-proved 2026-10-21. Other routes, including direct Apple Pay, still need interactive authorization.",
+	});
+	checks.push({
+		name: "public_discovery",
+		status: "warn",
+		detail:
+			"Full ON QR codes support unfamiliar locations via ON’s public resolver and live identity checks. Plain labels require account history or a known pole group. Public resolver availability is checked when used.",
+	});
 
 	report(checks, json);
 }
