@@ -1,0 +1,149 @@
+{
+  "$schema": "https://mcp.axelpaul.is/catalog.schema.json",
+  "id": "on",
+  "repo": "axelpaul/on-cli",
+  "name": "ON",
+  "service": "ON (Orka náttúrunnar)",
+  "serviceUrl": "https://www.on.is",
+  "tagline": "Charging stations, charging history and invoices from ON",
+  "description": "Check your charging history, registered cars and invoices with ON (Orka náttúrunnar), and find available charging stations. You can also start and stop charging through ON’s older system. That system is being phased out, so those functions may stop working.",
+  "examples": [
+    "How many kilowatt-hours did I use for charging last month?",
+    "Is there an available charger near Selfoss right now?",
+    "Stop my current charging session."
+  ],
+  "category": "Transport & energy",
+  "keywords": [
+    "hleðsla",
+    "rafbíll",
+    "EV",
+    "charging",
+    "Monta"
+  ],
+  "auth": "email+password",
+  "binaries": true,
+  "tools": [
+    {
+      "name": "monta_account",
+      "write": false,
+      "description": "Signed-in ON/Monta account (id, name, email)"
+    },
+    {
+      "name": "monta_vehicles",
+      "write": false,
+      "description": "Vehicles from the Monta backend"
+    },
+    {
+      "name": "monta_charges",
+      "write": false,
+      "description": "Charge history from the Monta backend"
+    },
+    {
+      "name": "monta_charge_points",
+      "write": false,
+      "description": "Charge points from the Monta backend"
+    },
+    {
+      "name": "whoami",
+      "write": false,
+      "description": "Logged-in user (legacy backend)"
+    },
+    {
+      "name": "vehicles",
+      "write": false,
+      "description": "Vehicles on the account (legacy backend)"
+    },
+    {
+      "name": "sessions",
+      "write": false,
+      "description": "Charging session history (legacy backend)"
+    },
+    {
+      "name": "session",
+      "write": false,
+      "description": "One charging session by id (legacy backend)"
+    },
+    {
+      "name": "live",
+      "write": false,
+      "description": "Active sessions, reservations and counters (legacy backend)"
+    },
+    {
+      "name": "keys",
+      "write": false,
+      "description": "RFID charging keys/cards (legacy backend)"
+    },
+    {
+      "name": "invoices",
+      "write": false,
+      "description": "Invoices, most recent first (legacy backend)"
+    },
+    {
+      "name": "locations",
+      "write": false,
+      "description": "Charging locations near a point, no login needed"
+    },
+    {
+      "name": "stop_charging",
+      "write": true,
+      "description": "Stop the active charging session"
+    },
+    {
+      "name": "start_charging",
+      "write": true,
+      "description": "Start charging at a given EVSE/connector"
+    }
+  ],
+  "commands": [
+    "on monta-login",
+    "on monta-charges",
+    "on monta-vehicles",
+    "on sessions --limit 5",
+    "on live",
+    "on locations --available",
+    "on invoices",
+    "on stop --yes",
+    "on start --evse <code> --connector <id>",
+    "on serve"
+  ],
+  "envVars": [
+    {
+      "name": "ON_MONTA_USER",
+      "description": "Email for non-interactive monta-login"
+    },
+    {
+      "name": "ON_MONTA_PW",
+      "description": "Password for non-interactive monta-login"
+    },
+    {
+      "name": "ON_USER",
+      "description": "Email for non-interactive legacy login"
+    },
+    {
+      "name": "ON_PW",
+      "description": "Password for non-interactive legacy login"
+    },
+    {
+      "name": "ON_BASE_URL",
+      "description": "Override the legacy Dusky API base URL"
+    },
+    {
+      "name": "ON_MCP_ENABLE_WRITES",
+      "description": "Set to 1 to expose start/stop charging MCP tools"
+    },
+    {
+      "name": "XDG_CONFIG_HOME",
+      "description": "Base config directory (default ~/.config)"
+    }
+  ],
+  "writesEnvVar": "ON_MCP_ENABLE_WRITES",
+  "is": {
+    "tagline": "Hleðslustöðvar, hleðslusaga og reikningar hjá ON",
+    "description": "Skoðaðu hleðslusöguna þína, skráða bíla og reikninga hjá Orku náttúrunnar og finndu lausar hleðslustöðvar. Einnig er hægt að hefja og stöðva hleðslu í gegnum eldra kerfi ON. Verið er að leggja það kerfi niður, svo sá hluti tólsins gæti hætt að virka.",
+    "examples": [
+      "Hversu margar kílóvattstundir notaði ég við hleðslu í síðasta mánuði?",
+      "Er laus hleðslustöð nálægt Selfossi núna?",
+      "Stöðvaðu hleðsluna sem er í gangi."
+    ]
+  }
+}
