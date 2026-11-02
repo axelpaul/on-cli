@@ -1,21 +1,18 @@
-// on start — start a charging session at a given EVSE/connector.
-//
-// Needs the EvseCode and connector id of the charger you're plugged into. You
-// get these from the charger (QR / label) or from a prior session's identifiers.
-// Mutating: asks for confirmation unless --yes.
-//
-// EvseCode format (non-roaming ON): `${chargePointFriendlyCode}-${evseFriendlyCode}-${connectorCode}`.
-
-import { AuthError } from "../lib/api.ts";
-import { color, die, dieAuth, isJsonMode, printJson } from "../lib/output.ts";
-import { confirm } from "../lib/prompt.ts";
-import { authedClient } from "../lib/session.ts";
-import type { ChargingCommandBody } from "../lib/types.ts";
+// Monta consumer start. Preview by default; never retry a charge mutation.
+import {
+	resolvePoint,
+	startBlockers,
+	startPaymentSupported,
+	startPreview,
+} from "../lib/charging.ts";
+import { MontaClient } from "../lib/monta.ts";
+import { die, isJsonMode, printJson } from "../lib/output.ts";
+import { loadMontaAuth } from "../lib/storage.ts";
 
 interface StartFlags {
+	chargepoint?: string;
 	evse?: string;
 	connector?: string;
-	chargepoint?: string;
 	preauth?: string;
 	coupon?: string;
 	yes?: boolean;
@@ -23,71 +20,49 @@ interface StartFlags {
 	pretty?: boolean;
 }
 
-function intFlag(v: string | undefined, name: string, json: boolean): number | undefined {
-	if (v === undefined) return undefined;
-	const n = Number.parseInt(v, 10);
-	if (!Number.isFinite(n)) die(`Invalid --${name}: ${v}`, 64, json);
-	return n;
-}
-
 export async function startCommand(flags: StartFlags): Promise<void> {
 	const json = isJsonMode(flags);
-
-	if (!flags.evse) {
-		die("Missing --evse <EvseCode>. (Format: chargePointCode-evseCode-connectorCode.)", 64, json);
-	}
-	const connector = intFlag(flags.connector, "connector", json);
-	if (connector === undefined) die("Missing --connector <id>.", 64, json);
-
-	const body: ChargingCommandBody = {
-		EvseCode: flags.evse,
-		ConnectorId: connector,
-		PreauthorizationId: intFlag(flags.preauth, "preauth", json),
-		CouponId: intFlag(flags.coupon, "coupon", json),
-		SocLimits: false,
-	};
-
-	const client = authedClient(json);
-
-	if (!flags.yes) {
-		if (!process.stdout.isTTY)
-			die("Refusing to start without confirmation. Re-run with --yes.", 1, json);
-		const proceed = await confirm(
-			`Start charging at ${color.cyan(flags.evse)} (connector ${connector})?`,
+	if (flags.evse || flags.connector || flags.preauth || flags.coupon)
+		die(
+			"Retired Dusky flags are not supported. Use --chargepoint <Monta ID>; pole labels are not Monta IDs.",
+			64,
+			json,
 		);
-		if (!proceed) {
-			if (json) printJson({ started: false, reason: "cancelled" });
-			else console.log("Cancelled.");
-			return;
-		}
+	if (!flags.chargepoint)
+		die("Missing --chargepoint <Monta ID or full ON QR/connector label>", 64, json);
+	const auth = loadMontaAuth();
+	if (!auth?.accessToken) die('Monta login required. Run "on monta-login".', 2, json);
+	const client = new MontaClient(auth!);
+	const point = await resolvePoint(client, flags.chargepoint!);
+	const preview = startPreview(point);
+	if (!flags.yes) {
+		printJson(preview);
+		return;
 	}
-
-	try {
-		const res = await client.startCharging(body);
-		const success = res.ResultCode === 0 || res.ResultCode === undefined;
-		if (json) {
-			printJson({
-				started: success,
-				charging_authorization_id: res.ChargingAuthorizationId ?? null,
-				result_code: res.ResultCode ?? null,
-				error: res.ErrorDescription ?? null,
-			});
-			if (!success) process.exit(1);
-			return;
-		}
-		if (success) {
-			console.log(color.green(`✓ Start command sent for ${flags.evse}.`));
-			console.log(color.dim("  Check `on live` in a few seconds."));
-		} else {
-			console.log(
-				color.red(
-					`✗ Start failed${res.ErrorDescription ? `: ${res.ErrorDescription}` : ` (code ${res.ResultCode})`}.`,
-				),
-			);
-			process.exit(1);
-		}
-	} catch (e) {
-		if (e instanceof AuthError) dieAuth("expired", json);
-		throw e;
+	const blockers = startBlockers(point);
+	if (blockers.length) {
+		printJson({ ...preview, refused: true, reason: blockers.join(", ") });
+		process.exitCode = 1;
+		return;
 	}
+	// Use only the live-proved server-default saved-source path or free charging.
+	if (!startPaymentSupported(point)) {
+		printJson({
+			...preview,
+			refused: true,
+			reason: "INTERACTIVE_PAYMENT_REQUIRED",
+			message:
+				"Use checkout_url; this payment route requires interactive authorization. No request was sent.",
+		});
+		process.exitCode = 1;
+		return;
+	}
+	const result = await client.startCharge(point.id);
+	printJson({
+		backend: "monta",
+		command_sent: true,
+		charging_verified: false,
+		result,
+		next: "Verify the session with on monta-charges --json; do not repeat start if the response is ambiguous.",
+	});
 }

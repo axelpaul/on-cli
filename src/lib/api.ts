@@ -20,6 +20,7 @@ import type {
 	PeriodicData,
 	ResultCodeResponse,
 	RfidCard,
+	RoamingChargingCommandStopBody,
 	StopResponse,
 	TokenResponse,
 	Vehicle,
@@ -272,6 +273,11 @@ export class OnClient {
 		return this.post<StopResponse>("/api/commands/remoteStopTransaction", body);
 	}
 
+	/** App-native graceful stop for a roaming session. */
+	stopChargingRoaming(body: RoamingChargingCommandStopBody): Promise<StopResponse> {
+		return this.post<StopResponse>("/api/commands/remoteStopRoaming", body);
+	}
+
 	/** Force-stop by connector id. Simpler fallback when the graceful stop fails. */
 	stopChargingForce(connectorId: number): Promise<ResultCodeResponse> {
 		return this.post<ResultCodeResponse>(
@@ -341,6 +347,7 @@ export function isRoamingSession(s: CurrentSession): boolean {
 export interface StopTarget {
 	body: ChargingCommandBody;
 	roaming: boolean;
+	roamingPlatformId?: number;
 	connectorId?: number;
 	location?: string;
 }
@@ -357,6 +364,7 @@ export function buildStopTarget(s: CurrentSession): StopTarget {
 	const connCode = s.Connector?.Code;
 	const chargePointId = s.ChargePoint?.Id;
 	const connectorId = s.Connector?.Id;
+	const roamingPlatformId = s.RoamingActor?.RoamingPlatform?.Id;
 
 	const EvseCode = roaming
 		? evseCode
@@ -375,6 +383,7 @@ export function buildStopTarget(s: CurrentSession): StopTarget {
 	return {
 		body: { EvseCode, ChargePointId: chargePointId, ConnectorId: connectorId, SocLimits: false },
 		roaming,
+		roamingPlatformId,
 		connectorId,
 		location: s.Location?.FriendlyName,
 	};
